@@ -110,7 +110,8 @@ def generate_episode(n_steps=20, metric='HTM'):
 
 # Returns all possible next states and rewards
 # Input: state
-# Output: [state_next_1, ... state_next_18], [-1, -1, +1, -1, ...]
+# Output:
+# [state_next_1, ... state_next_18], [-1, -1, +1, -1, ...]
 def transitions(state, metric='HTM'):
     action_len = len(action_list[metric])
     c = Cube()
@@ -129,7 +130,7 @@ def transitions(state, metric='HTM'):
         if s_next == state_Terminal:
             rewards.append(1)
         else:
-            rewards.append(0)
+            rewards.append(-1)
     return states_next, rewards
 
 
@@ -181,11 +182,16 @@ class Cube:
         #            e11 [D] e09
         #           c04 e08 c05  : 1st layer
 
+    def set_terminal(self):
+        self.corner_permutation = [YBO, YOG, YGR, YRB, WBR, WRG, WGO, WOB]  # 0 to 7
+        self.corner_orientation = [0, 0, 0, 0, 0, 0, 0, 0]  # 0 to 2
+        self.edge_permutation = [YO, YG, YR, YB, OB, OG, RG, RB, WR, WG, WO, WB]    # 0 to 11
+        self.edge_orientation = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]    # 0 to 1
+
     def get_state(self):
         return self.corner_permutation + self.corner_orientation + self.edge_permutation + self.edge_orientation
 
     def printcube(self):
-
         self.decode_state_to_color()
         for face in 'ULFRBD':
             print([[item for item in row] for row in self.surface_colour[face]])
@@ -282,14 +288,11 @@ class Cube:
 
     # input can be either cube letter such as 'U' or action number such as 0
     def rotate(self, action):
-        cp0, cp1, cp2, cp3, cp4, cp5, cp6, cp7 = self.corner_permutation
-        co0, co1, co2, co3, co4, co5, co6, co7 = self.corner_orientation
-        ep0, ep1, ep2, ep3, ep4, ep5, ep6, ep7, ep8, ep9, ep10, ep11 = self.edge_permutation
-        eo0, eo1, eo2, eo3, eo4, eo5, eo6, eo7, eo8, eo9, eo10, eo11 = self.edge_orientation
-
         if type(action) == int:
             action_repeat = [1, 3, 2][int(action/6)]
             action = ['U', 'D', 'F', 'B', 'R', 'L'][action % 6]
+        elif action in ['U', 'D', 'F', 'B', 'R', 'L']:
+            action_repeat = 1
         elif action in ['U\'', 'D\'', 'F\'', 'B\'', 'R\'', 'L\'']:
             action_repeat = 3
             action = action[0]
@@ -302,6 +305,10 @@ class Cube:
         for _ in range(action_repeat):
             # Clockwise turn
             # U: 'YBR' -> 'YRG'
+            cp0, cp1, cp2, cp3, cp4, cp5, cp6, cp7 = self.corner_permutation
+            co0, co1, co2, co3, co4, co5, co6, co7 = self.corner_orientation
+            ep0, ep1, ep2, ep3, ep4, ep5, ep6, ep7, ep8, ep9, ep10, ep11 = self.edge_permutation
+            eo0, eo1, eo2, eo3, eo4, eo5, eo6, eo7, eo8, eo9, eo10, eo11 = self.edge_orientation
             if action == 'U':
                 self.corner_permutation = [cp3, cp0, cp1, cp2, cp4, cp5, cp6, cp7]  # <3210> cyclic
                 self.corner_orientation = [co3, co0, co1, co2, co4, co5, co6, co7]  # <3210> cyclic
@@ -408,3 +415,10 @@ class Cube:
 #             self.edge_orientation = [ep0, ep1, ep2, ep3, ep4, ep5, ep6, ep7, ep8, ep9, ep10, ep11]
 
         # print(self.corner_permutation, '\n', self.corner_orientation, '\n', self.edge_permutation, '\n', self.edge_orientation)
+
+if __name__ == "__main__":
+    c = Cube()
+    c.rotate('F2')
+    states, r = transitions(c.get_state())
+    print(r.index(1), states.index(state_Terminal))
+
