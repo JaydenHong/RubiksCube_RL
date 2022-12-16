@@ -9,10 +9,6 @@ import csv
 import os
 
 
-N_SAMPLES = 200
-N_EPOCH = 10000
-gamma = 1
-
 # https://androidkt.com/when-use-categorical_accuracy-sparse_categorical_accuracy-in-keras/
 def sparse_categorical_accuracy(y_true, y_pred):
     return K.cast(K.equal(K.max(y_true, axis=-1),
@@ -44,25 +40,31 @@ def get_model(lr=0.0001):
 
     model = Model(input1, [out_value, out_policy])
 
-    model.compile(loss={"value": "mae", "policy": "sparse_categorical_crossentropy"}, optimizer=Adam(lr),
+    model.compile(loss={"value": "mse", "policy": "sparse_categorical_crossentropy"}, optimizer=Adam(lr),
                   metrics={"policy": sparse_categorical_accuracy})
     model.summary()
 
     return model
 
 
+N_SAMPLES = 800
+N_EPOCH = 10000
+gamma = 1
+
 def train():
-    file_path = 'checkpoint-batch-{}-trial-001.h5'.format(N_SAMPLES)
-    checkpoint = ModelCheckpoint(file_path, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
+    file_path_load = 'checkpoint-batch-800-trial-002.h5'
+    file_path_save = 'checkpoint-batch-800-trial-002.h5'
+    checkpoint = ModelCheckpoint(file_path_load, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
     early = EarlyStopping(monitor="val_loss", mode="min", patience=1000)
     reduce_on_plateau = ReduceLROnPlateau(monitor="val_loss", mode="min", factor=0.1, patience=50, min_lr=1e-8)
     callbacks_list = [checkpoint, early, reduce_on_plateau]
 
     model = get_model(lr=0.0001)
-    if os.path.exists(file_path):
-        model.load_weights(file_path)
+    if os.path.exists(file_path_load):
+        model.load_weights(file_path_load)
 
     for i in tqdm(range(N_EPOCH)):
+        print(i)
         history = []  # empty the log list every epoch after updating logfile
         states = []
         cube_depth = []
@@ -83,12 +85,16 @@ def train():
             state_next.extend(s_next)
         # rewards=[[r for all a from s1], [r for all a from s2], ...]
         # state_next=[[s' for all a form s1], [s-' for all a form s2],...]
-        for _ in range(20):  # update w~ after 20 steps
+        print(model.predict(np.array(states[:20]), batch_size=1024)[0].ravel().tolist())
+        print(model.predict(np.array(states[20:40]), batch_size=1024)[0].ravel().tolist())
+        print(model.predict(np.array(states[40:60]), batch_size=1024)[0].ravel().tolist())
+
+        for _ in range(20):  # every 20 iteration, regenerate the replay buffer
 
             replayBuffer_target_v = []
             replayBuffer_target_policy = []
 
-            # calculate v(s') for all a for all s
+            # calculate v(s') for all a for all sample states
             v_state_next, _ = model.predict(np.array(state_next), batch_size=1024)
             v_state_next = v_state_next.ravel().tolist()
             # group the v(s') for s
@@ -114,22 +120,18 @@ def train():
 
             result = model.fit(np.array(states),
                                [np.array(replayBuffer_target_v), np.array(replayBuffer_target_policy)[..., np.newaxis]],
-                               epochs=1, batch_size=128, sample_weight=[sample_weights, sample_weights])
-            # run only one epoch as it updates the value only once for every iteration
+                               epochs=1, batch_size=512, sample_weight=[sample_weights, sample_weights])
+            # run only one epoch so that it updates DNN only once for every iteration
+            # i.e. policy and value are updated every iteration
             history.append(result.history)
-            # with open('result.csv', 'a', newline = '') as csv:
-            #     writer = csv.DictWriter(csv, fieldnames=csv_columns)
-            #     writer.writeheader()
-            #     for data in dict_data:
-            #         writer.writerow(data)
 
-        with open('history1.csv', 'a') as csvfile:
+        with open('history1.csv', 'a', newline='') as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=history[0].keys())
             if not csvfile.tell():
                 writer.writeheader()
             writer.writerows(history)
 
-        model.save_weights(file_path)
+        model.save_weights(file_path_save)
 
 
 if __name__ == "__main__":
