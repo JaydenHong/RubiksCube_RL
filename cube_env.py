@@ -109,9 +109,9 @@ def generate_episode(n_steps=20, metric='HTM'):
 
 
 # Returns all possible next states and rewards
-# Input: state
-# Output:
-# [state_next_1, ... state_next_18], [-1, -1, +1, -1, ...]
+# Input: flat_state
+# Output: flat next states, rewards
+# [flat_state_next_1, ... flat_state_next_18], [-1, -1, +1, -1, ...]
 def transitions(state, metric='HTM'):
     action_len = len(action_list[metric])
     c = Cube()
@@ -131,6 +131,7 @@ def transitions(state, metric='HTM'):
             rewards.append(1)
         else:
             rewards.append(-1)
+        # rewards.append(-1)
     return states_next, rewards
 
 
